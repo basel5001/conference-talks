@@ -1,0 +1,25 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":disableDependencyDashboard"
+  ],
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "matchManagers": ["regex"],
+      "automerge": false
+    }
+  ],
+  "regexManagers": [
+    {
+      "fileMatch": ["\\.html$"],
+      "matchStrings": [
+        "cdn\\.jsdelivr\\.net/npm/reveal\\.js@(?<currentValue>[^/]+)/"
+      ],
+      "depNameTemplate": "reveal.js",
+      "packageNameTemplate": "hakimel/reveal.js",
+      "datasourceTemplate": "github-releases"
+    }
+  ]
+}

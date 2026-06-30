@@ -1,0 +1,163 @@
+/* Custom dark theme for conference talks */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+.reveal {
+  font-family: 'Inter', sans-serif;
+  color: #e0e0e0;
+}
+
+.reveal h1, .reveal h2, .reveal h3 {
+  color: #18d26e;
+  text-transform: none;
+  font-weight: 700;
+}
+
+.reveal h1 {
+  font-size: 2.5em;
+}
+
+.reveal h2 {
+  font-size: 1.8em;
+}
+
+.reveal h3 {
+  font-size: 1.3em;
+}
+
+.reveal .slide-background {
+  background: #0a0a0a;
+}
+
+.reveal pre {
+  font-size: 0.7em;
+  box-shadow: none;
+  width: 100%;
+}
+
+.reveal pre code {
+  max-height: 500px;
+  border-radius: 8px;
+  padding: 1em;
+  font-family: 'JetBrains Mono', monospace;
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+}
+
+.reveal code {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.reveal .highlight {
+  color: #18d26e;
+  font-weight: bold;
+}
+
+.reveal .speaker-info {
+  font-size: 0.7em;
+  color: #888;
+}
+
+.reveal ul {
+  list-style-type: none;
+  padding-left: 0;
+}
+
+.reveal ul li::before {
+  content: "▸ ";
+  color: #18d26e;
+  font-weight: bold;
+}
+
+.reveal ol li::marker {
+  color: #18d26e;
+  font-weight: bold;
+}
+
+.reveal blockquote {
+  border-left: 4px solid #18d26e;
+  background: rgba(24, 210, 110, 0.05);
+  padding: 0.5em 1em;
+  font-style: italic;
+}
+
+.reveal a {
+  color: #18d26e;
+  text-decoration: none;
+}
+
+.reveal a:hover {
+  color: #20ff80;
+  text-decoration: underline;
+}
+
+.reveal .slide-number {
+  color: #888;
+  font-size: 0.5em;
+}
+
+.reveal table {
+  border-collapse: collapse;
+  margin: 0 auto;
+}
+
+.reveal table th {
+  background: #18d26e;
+  color: #000;
+  padding: 0.5em 1em;
+  font-weight: 600;
+}
+
+.reveal table td {
+  border: 1px solid #333;
+  padding: 0.4em 0.8em;
+}
+
+.reveal table tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Section divider slides */
+section[data-background-color="#18d26e"] h2 {
+  color: #000;
+}
+
+section[data-background-color="#18d26e"] p {
+  color: #1a1a1a;
+}
+
+/* Emoji/icon styling */
+.reveal .emoji {
+  font-size: 1.5em;
+  vertical-align: middle;
+}
+
+/* Two-column layout */
+.reveal .columns {
+  display: flex;
+  gap: 2em;
+}
+
+.reveal .columns .col {
+  flex: 1;
+}
+
+/* Stat/metric boxes */
+.reveal .stat-box {
+  background: rgba(24, 210, 110, 0.1);
+  border: 1px solid #18d26e;
+  border-radius: 8px;
+  padding: 1em;
+  text-align: center;
+  margin: 0.5em;
+}
+
+.reveal .stat-box .number {
+  font-size: 2em;
+  font-weight: 700;
+  color: #18d26e;
+}
+
+.reveal .stat-box .label {
+  font-size: 0.8em;
+  color: #aaa;
+}

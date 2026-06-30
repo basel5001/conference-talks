@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chaos Engineering in Practice: Breaking Things to Build Resilience</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css">
+  <link rel="stylesheet" href="../../shared/theme.css">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: Title -->
+      <section data-background-color="#0a0a0a">
+        <h1>Chaos Engineering in Practice</h1>
+        <h3>Breaking Things to Build Resilience</h3>
+        <br>
+        <p class="speaker-info">
+          <strong>Basel Mohamed</strong> | Senior DevOps Engineer<br>
+          <a href="https://github.com/basel5001">github.com/basel5001</a> |
+          <a href="https://linkedin.com/in/basel-mohamed-alam">LinkedIn</a>
+        </p>
+        <aside class="notes">
+          "Everything fails, all the time." — Werner Vogels.
+          The question isn't IF your system will fail, it's WHEN and whether you're ready.
+        </aside>
+      </section>
+
+      <!-- Slide 2: Why Chaos Engineering? -->
+      <section>
+        <h2>Why Chaos Engineering?</h2>
+        <br>
+        <blockquote>
+          "Chaos Engineering is the discipline of experimenting on a system
+          in order to build confidence in the system's capability to withstand
+          turbulent conditions in production."
+        </blockquote>
+        <br>
+        <p>-- <span class="highlight">Principles of Chaos Engineering</span></p>
+        <aside class="notes">
+          Netflix pioneered this with Chaos Monkey. The idea is simple:
+          break things on purpose so you can fix them before they break on their own.
+        </aside>
+      </section>
+
+      <!-- Slide 3: Real Outages -->
+      <section>
+        <h2>Real-World Outages</h2>
+        <br>
+        <table>
+          <thead>
+            <tr><th>Company</th><th>Cause</th><th>Duration</th><th>Cost</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>AWS us-east-1</td><td>DNS failure</td><td>4 hours</td><td>$150M+</td></tr>
+            <tr><td>GitHub</td><td>DB failover loop</td><td>24 hours</td><td>Unknown</td></tr>
+            <tr><td>Cloudflare</td><td>Bad regex</td><td>27 minutes</td><td>$2.5M</td></tr>
+            <tr><td>Facebook</td><td>BGP miscfg</td><td>6 hours</td><td>$60M+</td></tr>
+          </tbody>
+        </table>
+        <br>
+        <p>Could chaos engineering have caught these? <span class="highlight">Some of them, yes.</span></p>
+      </section>
+
+      <!-- Slide 4: Section Divider -->
+      <section data-background-color="#18d26e">
+        <h2>5 Experiment Types</h2>
+        <p>A systematic approach to breaking things</p>
+      </section>
+
+      <!-- Slide 5: Experiment Types -->
+      <section>
+        <h2>The 5 Experiment Types</h2>
+        <br>
+        <ol>
+          <li><span class="highlight">Pod Failure</span> -- Kill pods, verify self-healing</li>
+          <li><span class="highlight">Network Chaos</span> -- Latency, partition, packet loss</li>
+          <li><span class="highlight">Resource Stress</span> -- CPU, memory, disk exhaustion</li>
+          <li><span class="highlight">DNS Failure</span> -- Break name resolution</li>
+          <li><span class="highlight">Zone Outage</span> -- Simulate AZ failure</li>
+        </ol>
+      </section>
+
+      <!-- Slide 6: Experiment 1 - Pod Failure -->
+      <section>
+        <h2>Experiment 1: Pod Failure</h2>
+        <br>
+        <pre><code class="yaml" data-trim data-line-numbers="1-8|9-22">
+# Hypothesis: If we kill 50% of API pods,
+# the service remains available with < 500ms latency
+
+apiVersion: chaos.experiment/v1
+kind: PodFailure
+metadata:
+  name: api-pod-kill
+spec:
+  target:
+    namespace: production
+    labelSelector:
+      app: api-gateway
+    mode: percentage
+    value: 50
+  duration: 5m
+  steadyState:
+    - probe: http
+      url: https://api.example.com/health
+      expectedStatus: 200
+      maxLatency: 500ms
+      interval: 10s
+  rollback:
+    automatic: true
+        </code></pre>
+      </section>
+
+      <!-- Slide 7: Experiment 2 - Network Chaos -->
+      <section>
+        <h2>Experiment 2: Network Chaos</h2>
+        <br>
+        <pre><code class="yaml" data-trim data-line-numbers="1-5|6-18">
+# Hypothesis: Service handles 200ms added latency
+# without user-visible errors
+
+apiVersion: chaos.experiment/v1
+kind: NetworkChaos
+spec:
+  target:
+    namespace: production
+    labelSelector:
+      app: payment-service
+  action: delay
+  parameters:
+    latency: 200ms
+    jitter: 50ms
+    correlation: 25
+  duration: 10m
+  steadyState:
+    - probe: http
+      url: https://api.example.com/checkout
+      expectedStatus: 200
+      maxLatency: 2000ms
+        </code></pre>
+      </section>
+
+      <!-- Slide 8: Experiment 3 - Resource Stress -->
+      <section>
+        <h2>Experiment 3: Resource Stress</h2>
+        <br>
+        <pre><code class="yaml" data-trim data-line-numbers="1-5|6-18">
+# Hypothesis: HPA scales pods before OOM kill
+# when memory usage spikes to 90%
+
+apiVersion: chaos.experiment/v1
+kind: ResourceStress
+spec:
+  target:
+    namespace: production
+    labelSelector:
+      app: data-processor
+  stressors:
+    memory:
+      workers: 4
+      size: "256MB"
+    cpu:
+      workers: 2
+      load: 80
+  duration: 5m
+  steadyState:
+    - probe: kubernetes
+      resource: pods
+      condition: "all pods Running"
+        </code></pre>
+      </section>
+
+      <!-- Slide 9: Section Divider -->
+      <section data-background-color="#18d26e">
+        <h2>The Orchestrator</h2>
+        <p>Automating chaos experiments safely</p>
+      </section>
+
+      <!-- Slide 10: Orchestrator Design -->
+      <section>
+        <h2>Chaos Orchestrator Architecture</h2>
+        <br>
+        <pre><code class="text" data-trim>
+┌──────────────────────────────────────────────────┐
+│               Chaos Orchestrator                  │
+├──────────┬──────────────┬────────────────────────┤
+│ Experi-  │  Safety      │   AI Analysis          │
+│ ment     │  Controls    │   Engine               │
+│ Runner   │  (Circuit    │   (AWS Bedrock)         │
+│          │   Breaker)   │                         │
+├──────────┴──────────────┴────────────────────────┤
+│              Kubernetes API                       │
+├──────────────────────────────────────────────────┤
+│    Pods  │  Network  │  DNS  │  Resources        │
+└──────────┴───────────┴───────┴───────────────────┘
+        </code></pre>
+      </section>
+
+      <!-- Slide 11: Orchestrator Code -->
+      <section>
+        <h2>Orchestrator Core</h2>
+        <br>
+        <pre><code class="python" data-trim data-line-numbers="1-10|12-28">
+class ChaosOrchestrator:
+    def __init__(self):
+        self.experiments = ExperimentRegistry()
+        self.safety = SafetyController()
+        self.analyzer = AIAnalyzer()
+
+    async def run_experiment(
+        self, experiment: Experiment
+    ) -> ExperimentResult:
+
+        # Pre-flight safety checks
+        if not await self.safety.pre_check(experiment):
+            return ExperimentResult(
+                status="blocked",
+                reason="Safety check failed",
+            )
+
+        # Record steady state
+        baseline = await self.measure_steady_state(
+            experiment.steady_state_probes
+        )
+
+        # Inject fault
+        try:
+            await self.inject_fault(experiment)
+            await asyncio.sleep(experiment.duration)
+        finally:
+            # Always rollback
+            await self.rollback(experiment)
+
+        # Measure impact
+        result = await self.measure_impact(baseline)
+        return result
+        </code></pre>
+      </section>
+
+      <!-- Slide 12: Safety Controls -->
+      <section>
+        <h2>Safety Controls</h2>
+        <br>
+        <pre><code class="python" data-trim data-line-numbers="1-6|8-22">
+class SafetyController:
+    """Circuit breaker for chaos experiments."""
+
+    MAX_BLAST_RADIUS = 0.5  # Never affect > 50%
+    MIN_HEALTHY_REPLICAS = 1
+    BUSINESS_HOURS_ONLY = True
+
+    async def pre_check(self, exp: Experiment) -> bool:
+        checks = [
+            self._check_blast_radius(exp),
+            self._check_healthy_replicas(exp),
+            self._check_business_hours(),
+            self._check_no_active_incidents(),
+            self._check_approval_granted(exp),
+        ]
+
+        results = await asyncio.gather(*checks)
+
+        if not all(results):
+            failed = [c for c, r in zip(
+                ["blast_radius", "replicas", "hours",
+                 "incidents", "approval"], results
+            ) if not r]
+            logger.warning(f"Safety checks failed: {failed}")
+            return False
+        return True
+        </code></pre>
+        <aside class="notes">
+          Never run chaos without safety controls. The goal is controlled failure,
+          not actual outages.
+        </aside>
+      </section>
+
+      <!-- Slide 13: AI Analysis Section -->
+      <section data-background-color="#18d26e">
+        <h2>AI-Powered Analysis</h2>
+        <p>Making sense of chaos results</p>
+      </section>
+
+      <!-- Slide 14: AI Analyzer -->
+      <section>
+        <h2>AI Post-Experiment Analysis</h2>
+        <br>
+        <pre><code class="python" data-trim data-line-numbers="1-8|10-24">
+class AIAnalyzer:
+    def __init__(self):
+        self.bedrock = boto3.client("bedrock-runtime")
+
+    async def analyze_results(
+        self, experiment: Experiment,
+        baseline: Metrics, observed: Metrics
+    ) -> Analysis:
+
+        prompt = f"""Analyze this chaos experiment:
+
+        Experiment: {experiment.type}
+        Target: {experiment.target}
+        Duration: {experiment.duration}
+
+        Baseline metrics:
+        {json.dumps(baseline.to_dict())}
+
+        Observed metrics during chaos:
+        {json.dumps(observed.to_dict())}
+
+        Provide: resilience score (1-10), failure modes found,
+        recommendations, and whether the hypothesis held.
+        """
+
+        return Analysis.from_response(
+            self._invoke_model(prompt)
+        )
+        </code></pre>
+      </section>
+
+      <!-- Slide 15: AI Analysis Output -->
+      <section>
+        <h2>Analysis Report</h2>
+        <br>
+        <pre><code class="json" data-trim>
+{
+  "resilience_score": 7,
+  "hypothesis_held": true,
+  "observations": [
+    "Service recovered in 12 seconds after pod kill",
+    "P99 latency spiked to 850ms (baseline: 120ms)",
+    "No 5xx errors observed during recovery",
+    "HPA scaled from 3 to 5 pods within 45 seconds"
+  ],
+  "failure_modes": [
+    "Connection pool exhaustion during recovery window",
+    "Health check interval too long (30s → recommend 10s)"
+  ],
+  "recommendations": [
+    "Reduce health check interval to 10 seconds",
+    "Add connection pool pre-warming on startup",
+    "Configure PDB to ensure min 2 pods always available",
+    "Add retry logic with exponential backoff to clients"
+  ]
+}
+        </code></pre>
+      </section>
+
+      <!-- Slide 16: DR Integration -->
+      <section data-background-color="#18d26e">
+        <h2>DR Integration</h2>
+        <p>Chaos experiments as DR validation</p>
+      </section>
+
+      <!-- Slide 17: DR Scenarios -->
+      <section>
+        <h2>DR Validation via Chaos</h2>
+        <br>
+        <pre><code class="python" data-trim data-line-numbers="1-12|14-24">
+# DR scenarios as chaos experiments
+DR_SCENARIOS = [
+    {
+        "name": "primary-db-failure",
+        "type": "pod_failure",
+        "target": "postgresql-primary",
+        "hypothesis": "Replica promotes within 30s",
+        "schedule": "monthly",
+    },
+    {
+        "name": "az-failure",
+        "type": "zone_outage",
+        "target": "us-east-1a",
+        "hypothesis": "Traffic shifts to 1b and 1c",
+        "schedule": "quarterly",
+    },
+    {
+        "name": "cache-failure",
+        "type": "pod_failure",
+        "target": "redis-cluster",
+        "hypothesis": "App falls back to DB queries",
+        "schedule": "monthly",
+    },
+]
+        </code></pre>
+      </section>
+
+      <!-- Slide 18: Running Your First Experiment -->
+      <section data-background-color="#18d26e">
+        <h2>Running Your First Experiment</h2>
+        <p>A practical guide to getting started</p>
+      </section>
+
+      <!-- Slide 19: Getting Started -->
+      <section>
+        <h2>Start Here</h2>
+        <br>
+        <ol>
+          <li><span class="highlight">Pick a non-critical service</span> -- Start in staging</li>
+          <li><span class="highlight">Define the hypothesis</span> -- What should happen?</li>
+          <li><span class="highlight">Set up monitoring</span> -- You need observability first</li>
+          <li><span class="highlight">Start with pod failure</span> -- Simplest experiment</li>
+          <li><span class="highlight">Run during business hours</span> -- People are around to fix things</li>
+          <li><span class="highlight">Review and improve</span> -- Each experiment teaches something</li>
+        </ol>
+        <br><br>
+        <pre><code class="bash" data-trim>
+# Your very first chaos experiment
+$ kubectl delete pod api-gateway-xyz --namespace staging
+
+# That's it. See what happens. Fix what breaks.
+        </code></pre>
+      </section>
+
+      <!-- Slide 20: Results & Culture -->
+      <section data-background-color="#18d26e">
+        <h2>Results &amp; Culture Change</h2>
+      </section>
+
+      <!-- Slide 21: Metrics -->
+      <section>
+        <h2>Impact After 1 Year</h2>
+        <br>
+        <div style="display: flex; gap: 1em; justify-content: center; flex-wrap: wrap;">
+          <div class="stat-box">
+            <div class="number">73%</div>
+            <div class="label">Fewer P1 incidents</div>
+          </div>
+          <div class="stat-box">
+            <div class="number">4 min</div>
+            <div class="label">Avg recovery time</div>
+          </div>
+          <div class="stat-box">
+            <div class="number">99.95%</div>
+            <div class="label">Availability</div>
+          </div>
+          <div class="stat-box">
+            <div class="number">48</div>
+            <div class="label">Experiments run</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 22: Culture Change -->
+      <section>
+        <h2>Culture Change</h2>
+        <br>
+        <div class="columns">
+          <div class="col">
+            <h3>Before</h3>
+            <ul>
+              <li>"Don't touch production"</li>
+              <li>Fear of failure</li>
+              <li>Reactive firefighting</li>
+              <li>"We hope it works"</li>
+            </ul>
+          </div>
+          <div class="col">
+            <h3 style="color: #18d26e;">After</h3>
+            <ul>
+              <li>"Let's test in production"</li>
+              <li>Embrace controlled failure</li>
+              <li>Proactive resilience</li>
+              <li>"We know it works"</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 23: Key Takeaways -->
+      <section>
+        <h2>Key Takeaways</h2>
+        <br>
+        <ol>
+          <li><span class="highlight">Start small, fail safely</span> -- Pod kills before zone failures</li>
+          <li><span class="highlight">Hypothesis-driven</span> -- Always define expected behavior</li>
+          <li><span class="highlight">Safety first</span> -- Circuit breakers are non-negotiable</li>
+          <li><span class="highlight">AI accelerates learning</span> -- Pattern recognition at scale</li>
+          <li><span class="highlight">Chaos is a culture, not a tool</span></li>
+        </ol>
+      </section>
+
+      <!-- Slide 24: Resources -->
+      <section>
+        <h2>Resources</h2>
+        <br>
+        <ul>
+          <li><a href="https://github.com/basel5001/chaos-engineering">github.com/basel5001/chaos-engineering</a></li>
+          <li><a href="https://principlesofchaos.org">Principles of Chaos Engineering</a></li>
+          <li><a href="https://chaos-mesh.org">Chaos Mesh</a></li>
+          <li><a href="https://www.gremlin.com">Gremlin</a></li>
+          <li><a href="https://litmuschaos.io">LitmusChaos</a></li>
+        </ul>
+      </section>
+
+      <!-- Slide 25: Q&A -->
+      <section data-background-color="#18d26e">
+        <h2>Questions?</h2>
+        <br>
+        <p style="color: #000;">
+          <strong>Basel Mohamed</strong><br>
+          Senior DevOps Engineer<br><br>
+          github.com/basel5001<br>
+          linkedin.com/in/basel-mohamed-alam
+        </p>
+      </section>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/markdown/markdown.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+  <script src="../../shared/reveal-config.js"></script>
+</body>
+</html>

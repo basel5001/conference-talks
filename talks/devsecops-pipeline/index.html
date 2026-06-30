@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shift-Left Security: Building a Complete DevSecOps Pipeline</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css">
+  <link rel="stylesheet" href="../../shared/theme.css">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: Title -->
+      <section data-background-color="#0a0a0a">
+        <h1>Shift-Left Security</h1>
+        <h3>Building a Complete DevSecOps Pipeline</h3>
+        <br>
+        <p class="speaker-info">
+          <strong>Basel Mohamed</strong> | Senior DevOps Engineer<br>
+          <a href="https://github.com/basel5001">github.com/basel5001</a> |
+          <a href="https://linkedin.com/in/basel-mohamed-alam">LinkedIn</a>
+        </p>
+        <aside class="notes">
+          Security can't be an afterthought. Today I'll show you how to build
+          a pipeline that catches vulnerabilities before they reach production.
+        </aside>
+      </section>
+
+      <!-- Slide 2: The Security Gap -->
+      <section>
+        <h2>The Security Gap in CI/CD</h2>
+        <br>
+        <pre><code class="text" data-trim>
+Traditional Pipeline:
+
+  Code → Build → Test → Deploy → 🔒 Security Review
+
+The problem: Security finds issues AFTER deployment.
+Cost to fix: 10x-100x more expensive.
+
+DevSecOps Pipeline:
+
+  Code → 🔒 Scan → Build → 🔒 Scan → Test → 🔒 Scan → Deploy
+        </code></pre>
+        <aside class="notes">
+          The later you find a security issue, the more it costs.
+          Shift-left means moving security checks as early as possible.
+        </aside>
+      </section>
+
+      <!-- Slide 3: Cost of Late Detection -->
+      <section>
+        <h2>Cost of Late Detection</h2>
+        <br>
+        <div style="display: flex; gap: 1em; justify-content: center;">
+          <div class="stat-box">
+            <div class="number">$500</div>
+            <div class="label">Fix in Development</div>
+          </div>
+          <div class="stat-box">
+            <div class="number">$5,000</div>
+            <div class="label">Fix in Staging</div>
+          </div>
+          <div class="stat-box">
+            <div class="number">$50,000</div>
+            <div class="label">Fix in Production</div>
+          </div>
+        </div>
+        <br>
+        <p>Source: IBM Systems Science Institute</p>
+      </section>
+
+      <!-- Slide 4: Section Divider -->
+      <section data-background-color="#18d26e">
+        <h2>The 4-Scanner Approach</h2>
+        <p>Defense in depth for your code</p>
+      </section>
+
+      <!-- Slide 5: Four Scanners -->
+      <section>
+        <h2>Four Lines of Defense</h2>
+        <br>
+        <table>
+          <thead>
+            <tr><th>Scanner</th><th>What It Finds</th><th>Tool</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Secrets</td><td>API keys, passwords, tokens</td><td>Gitleaks</td></tr>
+            <tr><td>Dependencies</td><td>Known CVEs in packages</td><td>Trivy</td></tr>
+            <tr><td>SAST</td><td>Code vulnerabilities</td><td>Semgrep</td></tr>
+            <tr><td>IaC</td><td>Misconfigurations</td><td>Checkov</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Slide 6: Scanner 1 - Secrets -->
+      <section>
+        <h2>Scanner 1: Secret Detection</h2>
+        <br>
+        <pre><code class="python" data-trim data-line-numbers="1-3|5-18">
+class SecretScanner:
+    """Detect hardcoded secrets using Gitleaks."""
+
+    TOOL = "gitleaks"
+
+    async def scan(self, target: str) -> ScanResult:
+        cmd = [
+            "gitleaks", "detect",
+            "--source", target,
+            "--report-format", "json",
+            "--report-path", self.report_path,
+            "--no-git",
+        ]
+        result = await self._run(cmd)
+
+        findings = self._parse_findings(result)
+        return ScanResult(
+            scanner="secrets",
+            findings=findings,
+            severity=self._calculate_severity(findings),
+        )
+        </code></pre>
+        <aside class="notes">
+          Gitleaks is fast and catches patterns like AWS keys, GitHub tokens,
+          database passwords. We run it on every commit.
+        </aside>
+      </section>
+
+      <!-- Slide 7: Scanner 2 - Dependencies -->
+      <section>
+        <h2>Scanner 2: Dependency Scanning</h2>
+        <br>
+        <pre><code class="python" data-trim data-line-numbers="1-3|5-15">
+class DependencyScanner:
+    """Scan dependencies for known CVEs using Trivy."""
+
+    TOOL = "trivy"
+
+    async def scan(self, target: str) -> ScanResult:
+        cmd = [
+            "trivy", "fs",
+            "--format", "json",
+            "--output", self.report_path,
+            "--severity", "HIGH,CRITICAL",
+            "--scanners", "vuln",
+            target,
+        ]
+        result = await self._run(cmd)
+        return self._parse_trivy_output(result)
+        </code></pre>
+        <p>Catches vulnerabilities in <code>package.json</code>, <code>requirements.txt</code>, <code>go.mod</code>, etc.</p>
+      </section>
+
+      <!-- Slide 8: Scanner 3 - SAST -->
+      <section>
+        <h2>Scanner 3: Static Analysis (SAST)</h2>
+        <br>
+        <pre><code class="python" data-trim data-line-numbers="1-3|5-16">
+class SASTScanner:
+    """Static code analysis using Semgrep."""
+
+    TOOL = "semgrep"
+
+    async def scan(self, target: str) -> ScanResult:
+        cmd = [
+            "semgrep", "scan",
+            "--config", "auto",
+            "--json",
+            "--output", self.report_path,
+            "--severity", "WARNING",
+            target,
+        ]
+        result = await self._run(cmd)
+        return self._parse_semgrep_output(result)
+        </code></pre>
+        <p>Finds SQL injection, XSS, insecure deserialization, and more</p>
+      </section>
+
+      <!-- Slide 9: Scanner 4 - IaC -->
+      <section>
+        <h2>Scanner 4: Infrastructure as Code</h2>
+        <br>
+        <pre><code class="python" data-trim data-line-numbers="1-3|5-17">
+class IaCScanner:
+    """Scan IaC files for misconfigurations using Checkov."""
+
+    TOOL = "checkov"
+
+    async def scan(self, target: str) -> ScanResult:
+        cmd = [
+            "checkov",
+            "-d", target,
+            "--framework", "terraform,kubernetes,dockerfile",
+            "--output", "json",
+            "--output-file-path", self.report_dir,
+            "--quiet",
+        ]
+        result = await self._run(cmd)
+        return self._parse_checkov_output(result)
+        </code></pre>
+        <p>Catches open S3 buckets, missing encryption, overly permissive IAM roles</p>
+      </section>
+
+      <!-- Slide 10: Section Divider -->
+      <section data-background-color="#18d26e">
+        <h2>AI-Powered Risk Analysis</h2>
+        <p>AWS Bedrock + Claude for intelligent triage</p>
+      </section>
+
+      <!-- Slide 11: The AI Layer -->
+      <section>
+        <h2>Why AI for Security?</h2>
+        <br>
+        <ul>
+          <li><span class="highlight">Too many findings</span> - Scanners produce noise</li>
+          <li><span class="highlight">Context matters</span> - Not all "HIGH" are actually high</li>
+          <li><span class="highlight">Actionable advice</span> - "Fix this" > "Vulnerability found"</li>
+          <li><span class="highlight">Pattern recognition</span> - Correlate across scanners</li>
+        </ul>
+      </section>
+
+      <!-- Slide 12: AI Analyzer Code -->
+      <section>
+        <h2>AI Risk Analyzer</h2>
+        <br>
+        <pre><code class="python" data-trim data-line-numbers="1-8|10-22">
+class AIAnalyzer:
+    def __init__(self):
+        self.client = boto3.client(
+            "bedrock-runtime",
+            region_name="us-east-1"
+        )
+        self.model = "anthropic.claude-3-sonnet-20240229-v1:0"
+
+    async def analyze(self, findings: list[Finding]) -> RiskReport:
+        prompt = f"""Analyze these security findings and provide:
+        1. Risk score (1-10) with justification
+        2. Priority ranking of findings
+        3. Remediation steps for each
+        4. False positive assessment
+
+        Findings:
+        {json.dumps([f.to_dict() for f in findings])}
+        """
+
+        response = self._invoke_model(prompt)
+        return RiskReport.from_ai_response(response)
+        </code></pre>
+      </section>
+
+      <!-- Slide 13: AI Output Example -->
+      <section>
+        <h2>AI Analysis Output</h2>
+        <br>
+        <pre><code class="json" data-trim>
+{
+  "risk_score": 7,
+  "summary": "2 critical findings require immediate action",
+  "findings": [
+    {
+      "id": "SEC-001",
+      "original_severity": "HIGH",
+      "ai_severity": "CRITICAL",
+      "reason": "AWS access key in source code with write perms",
+      "remediation": "Rotate key immediately. Use IAM roles.",
+      "false_positive": false
+    },
+    {
+      "id": "SEC-002",
+      "original_severity": "HIGH",
+      "ai_severity": "LOW",
+      "reason": "Test file contains mock API key (not real)",
+      "false_positive": true
+    }
+  ]
+}
+        </code></pre>
+      </section>
+
+      <!-- Slide 14: Section Divider -->
+      <section data-background-color="#18d26e">
+        <h2>GitHub Action Packaging</h2>
+        <p>Reusable across all repositories</p>
+      </section>
+
+      <!-- Slide 15: GitHub Action -->
+      <section>
+        <h2>The GitHub Action</h2>
+        <br>
+        <pre><code class="yaml" data-trim data-line-numbers="1-6|7-18|19-25">
+name: "DevSecOps Pipeline"
+description: "Run 4 security scanners with AI analysis"
+inputs:
+  aws-region:
+    description: "AWS region for Bedrock"
+    default: "us-east-1"
+runs:
+  using: "composite"
+  steps:
+    - name: Run Secret Scanner
+      run: python -m devsecops scan --scanner secrets
+    - name: Run Dependency Scanner
+      run: python -m devsecops scan --scanner dependencies
+    - name: Run SAST Scanner
+      run: python -m devsecops scan --scanner sast
+    - name: Run IaC Scanner
+      run: python -m devsecops scan --scanner iac
+    - name: AI Analysis
+      run: python -m devsecops analyze
+    - name: Generate Report
+      run: python -m devsecops report
+    - name: Upload Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-report
+        path: reports/
+        </code></pre>
+      </section>
+
+      <!-- Slide 16: Usage -->
+      <section>
+        <h2>Using It in Your Repo</h2>
+        <br>
+        <pre><code class="yaml" data-trim>
+# .github/workflows/security.yml
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: basel5001/devsecops-pipeline@v1
+        with:
+          aws-region: us-east-1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
+        </code></pre>
+        <p>Two lines to add full security scanning to any repo</p>
+      </section>
+
+      <!-- Slide 17: Results -->
+      <section data-background-color="#18d26e">
+        <h2>Results &amp; Metrics</h2>
+      </section>
+
+      <!-- Slide 18: Results -->
+      <section>
+        <h2>Impact After 6 Months</h2>
+        <br>
+        <div style="display: flex; gap: 1em; justify-content: center; flex-wrap: wrap;">
+          <div class="stat-box">
+            <div class="number">94%</div>
+            <div class="label">Issues caught pre-merge</div>
+          </div>
+          <div class="stat-box">
+            <div class="number">67%</div>
+            <div class="label">Reduction in false positives</div>
+          </div>
+          <div class="stat-box">
+            <div class="number">3 min</div>
+            <div class="label">Average scan time</div>
+          </div>
+          <div class="stat-box">
+            <div class="number">0</div>
+            <div class="label">Secrets leaked to prod</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 19: Key Takeaways -->
+      <section>
+        <h2>Key Takeaways</h2>
+        <br>
+        <ol>
+          <li><span class="highlight">Layer your scanners</span> - No single tool catches everything</li>
+          <li><span class="highlight">AI reduces noise</span> - Focus on what matters</li>
+          <li><span class="highlight">Package as an Action</span> - Consistency across repos</li>
+          <li><span class="highlight">Block merges, not builds</span> - Security gates on PRs</li>
+          <li><span class="highlight">Iterate on rules</span> - Tune for your codebase</li>
+        </ol>
+      </section>
+
+      <!-- Slide 20: Resources -->
+      <section>
+        <h2>Resources</h2>
+        <br>
+        <ul>
+          <li><a href="https://github.com/basel5001/devsecops-pipeline">github.com/basel5001/devsecops-pipeline</a></li>
+          <li><a href="https://gitleaks.io">Gitleaks</a></li>
+          <li><a href="https://trivy.dev">Trivy</a></li>
+          <li><a href="https://semgrep.dev">Semgrep</a></li>
+          <li><a href="https://checkov.io">Checkov</a></li>
+        </ul>
+      </section>
+
+      <!-- Slide 21: Q&A -->
+      <section data-background-color="#18d26e">
+        <h2>Questions?</h2>
+        <br>
+        <p style="color: #000;">
+          <strong>Basel Mohamed</strong><br>
+          Senior DevOps Engineer<br><br>
+          github.com/basel5001<br>
+          linkedin.com/in/basel-mohamed-alam
+        </p>
+      </section>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/markdown/markdown.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+  <script src="../../shared/reveal-config.js"></script>
+</body>
+</html>

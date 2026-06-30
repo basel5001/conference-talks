@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitOps at Scale: Managing 22 Repos with One Config File</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css">
+  <link rel="stylesheet" href="../../shared/theme.css">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: Title -->
+      <section data-background-color="#0a0a0a">
+        <h1>GitOps at Scale</h1>
+        <h3>Managing 22 Repos with One Config File</h3>
+        <br>
+        <p class="speaker-info">
+          <strong>Basel Mohamed</strong> | Senior DevOps Engineer<br>
+          <a href="https://github.com/basel5001">github.com/basel5001</a> |
+          <a href="https://linkedin.com/in/basel-mohamed-alam">LinkedIn</a>
+        </p>
+        <aside class="notes">
+          Welcome everyone. Today I'm going to share how we manage 22 repositories
+          across multiple teams using a single TypeScript configuration file and GitOps principles.
+        </aside>
+      </section>
+
+      <!-- Slide 2: The Problem -->
+      <section>
+        <h2>The Problem</h2>
+        <br>
+        <div class="columns">
+          <div class="col">
+            <h3>22 Repositories</h3>
+            <ul>
+              <li>Inconsistent branch protection</li>
+              <li>Manual security settings</li>
+              <li>Drift between repos</li>
+              <li>No audit trail</li>
+            </ul>
+          </div>
+          <div class="col">
+            <h3>Multiple Teams</h3>
+            <ul>
+              <li>Different naming conventions</li>
+              <li>Inconsistent CI/CD</li>
+              <li>Security gaps</li>
+              <li>"It works on my repo"</li>
+            </ul>
+          </div>
+        </div>
+        <aside class="notes">
+          Before GitOps, every repo was a snowflake. Settings applied manually through the UI.
+          No way to know if a repo was compliant without checking each one.
+        </aside>
+      </section>
+
+      <!-- Slide 3: What is GitOps? -->
+      <section data-background-color="#18d26e">
+        <h2>What is GitOps?</h2>
+        <p>Git as the single source of truth for <strong>everything</strong></p>
+      </section>
+
+      <!-- Slide 4: GitOps Principles -->
+      <section>
+        <h2>GitOps Principles</h2>
+        <br>
+        <ol>
+          <li><span class="highlight">Declarative</span> - Describe the desired state</li>
+          <li><span class="highlight">Versioned</span> - Git tracks all changes</li>
+          <li><span class="highlight">Automated</span> - Changes applied automatically</li>
+          <li><span class="highlight">Self-healing</span> - Drift is detected and corrected</li>
+        </ol>
+        <aside class="notes">
+          These four principles guide everything we build. If it's not in Git, it doesn't exist.
+        </aside>
+      </section>
+
+      <!-- Slide 5: Why It Matters -->
+      <section>
+        <h2>Why GitOps Matters</h2>
+        <br>
+        <div style="display: flex; gap: 1em; justify-content: center;">
+          <div class="stat-box">
+            <div class="number">100%</div>
+            <div class="label">Audit Coverage</div>
+          </div>
+          <div class="stat-box">
+            <div class="number">0</div>
+            <div class="label">Manual Changes</div>
+          </div>
+          <div class="stat-box">
+            <div class="number">&lt;5min</div>
+            <div class="label">New Repo Setup</div>
+          </div>
+          <div class="stat-box">
+            <div class="number">22</div>
+            <div class="label">Repos Managed</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 6: Architecture Overview -->
+      <section data-background-color="#18d26e">
+        <h2>Architecture</h2>
+        <p>ArgoCD + Crossplane + Kyverno</p>
+      </section>
+
+      <!-- Slide 7: Architecture Diagram -->
+      <section>
+        <h2>The Stack</h2>
+        <br>
+        <pre><code class="text" data-trim>
+┌─────────────────────────────────────────────────────┐
+│                    Git Repository                    │
+│              (Single Source of Truth)                 │
+├──────────┬──────────────┬───────────────────────────┤
+│          │              │                           │
+▼          ▼              ▼                           ▼
+┌────────┐ ┌────────────┐ ┌─────────┐ ┌─────────────┐
+│ ArgoCD │ │ Crossplane │ │ Kyverno │ │ Argo        │
+│        │ │            │ │         │ │ Rollouts    │
+│ Deploy │ │ Infra as   │ │ Policy  │ │ Progressive │
+│ Apps   │ │ Code       │ │ Engine  │ │ Delivery    │
+└────────┘ └────────────┘ └─────────┘ └─────────────┘
+        </code></pre>
+      </section>
+
+      <!-- Slide 8: ArgoCD -->
+      <section>
+        <h2>ArgoCD - Continuous Deployment</h2>
+        <br>
+        <pre><code class="yaml" data-trim data-line-numbers="1-5|6-11|12-18">
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitops-cluster
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/basel5001/gitops-cluster
+    targetRevision: main
+    path: manifests
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+        </code></pre>
+        <aside class="notes">
+          ArgoCD watches Git and automatically syncs the cluster state.
+          Self-heal means if someone makes a manual change, it gets reverted.
+        </aside>
+      </section>
+
+      <!-- Slide 9: Crossplane -->
+      <section>
+        <h2>Crossplane - Infrastructure as Code</h2>
+        <br>
+        <pre><code class="yaml" data-trim data-line-numbers="1-4|5-15">
+apiVersion: ec2.aws.crossplane.io/v1beta1
+kind: VPC
+metadata:
+  name: production-vpc
+spec:
+  forProvider:
+    region: us-east-1
+    cidrBlock: 10.0.0.0/16
+    enableDnsSupport: true
+    enableDnsHostnames: true
+    tags:
+      - key: Environment
+        value: production
+      - key: ManagedBy
+        value: crossplane
+        </code></pre>
+        <p>Kubernetes-native infrastructure provisioning</p>
+      </section>
+
+      <!-- Slide 10: Kyverno -->
+      <section>
+        <h2>Kyverno - Policy Engine</h2>
+        <br>
+        <pre><code class="yaml" data-trim data-line-numbers="1-6|7-20">
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-labels
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: check-team-label
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+                - Service
+      validate:
+        message: "Label 'team' is required"
+        pattern:
+          metadata:
+            labels:
+              team: "?*"
+        </code></pre>
+        <aside class="notes">
+          Kyverno enforces policies as Kubernetes resources. No separate policy language to learn.
+        </aside>
+      </section>
+
+      <!-- Slide 11: The Config File -->
+      <section data-background-color="#18d26e">
+        <h2>One Config File to Rule Them All</h2>
+        <p>TypeScript + Terraform</p>
+      </section>
+
+      <!-- Slide 12: githubinfra -->
+      <section>
+        <h2>githubinfra - Repository Configuration</h2>
+        <br>
+        <pre><code class="typescript" data-trim data-line-numbers="1-8|9-22|23-30">
+// repos.config.ts
+export const repos: RepoConfig[] = [
+  {
+    name: "gitops-cluster",
+    description: "Kubernetes GitOps configurations",
+    visibility: "public",
+    topics: ["kubernetes", "gitops", "argocd"],
+    branchProtection: {
+      main: {
+        requiredReviews: 1,
+        requireStatusChecks: true,
+        requiredChecks: ["lint", "test", "security"],
+        enforceAdmins: true,
+        dismissStaleReviews: true,
+      }
+    },
+    security: {
+      secretScanning: true,
+      dependabot: true,
+      codeScanning: true,
+    },
+    files: {
+      "CODEOWNERS": "* @basel5001",
+      ".github/workflows/security.yml": "gitleaks-template",
+    },
+    labels: defaultLabels,
+    autoMerge: { renovate: true },
+  },
+  // ... 21 more repos
+];
+        </code></pre>
+      </section>
+
+      <!-- Slide 13: How It Works -->
+      <section>
+        <h2>How It Works</h2>
+        <br>
+        <pre><code class="text" data-trim>
+1. Developer edits repos.config.ts
+         │
+2. Opens Pull Request
+         │
+3. CI validates config (type-check + dry-run)
+         │
+4. PR approved &amp; merged
+         │
+5. Terraform applies changes to all 22 repos
+         │
+6. Branch protection ✓ Security settings ✓
+   Labels ✓ Webhooks ✓ Team access ✓
+        </code></pre>
+      </section>
+
+      <!-- Slide 14: Terraform Provider -->
+      <section>
+        <h2>Terraform GitHub Provider</h2>
+        <br>
+        <pre><code class="hcl" data-trim data-line-numbers="1-6|8-18">
+provider "github" {
+  owner = "basel5001"
+  token = var.github_token
+}
+
+# Generated from repos.config.ts
+resource "github_repository" "repos" {
+  for_each    = { for r in local.repos : r.name => r }
+  name        = each.value.name
+  description = each.value.description
+  visibility  = each.value.visibility
+  
+  has_issues   = true
+  has_projects = false
+  has_wiki     = false
+
+  vulnerability_alerts = true
+  security_and_analysis {
+    secret_scanning {
+      status = "enabled"
+    }
+  }
+}
+        </code></pre>
+      </section>
+
+      <!-- Slide 15: Progressive Delivery -->
+      <section data-background-color="#18d26e">
+        <h2>Progressive Delivery</h2>
+        <p>Argo Rollouts for safe deployments</p>
+      </section>
+
+      <!-- Slide 16: Argo Rollouts -->
+      <section>
+        <h2>Canary Deployments with Argo Rollouts</h2>
+        <br>
+        <pre><code class="yaml" data-trim data-line-numbers="1-5|6-20">
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: api-service
+spec:
+  strategy:
+    canary:
+      steps:
+        - setWeight: 10
+        - pause: { duration: 5m }
+        - setWeight: 30
+        - pause: { duration: 5m }
+        - setWeight: 60
+        - pause: { duration: 5m }
+        - setWeight: 100
+      canaryService: api-canary
+      stableService: api-stable
+      trafficRouting:
+        istio:
+          virtualService:
+            name: api-vsvc
+        </code></pre>
+        <aside class="notes">
+          Traffic shifts gradually. If metrics degrade, automatic rollback kicks in.
+        </aside>
+      </section>
+
+      <!-- Slide 17: Monitoring the Rollout -->
+      <section>
+        <h2>Automated Analysis</h2>
+        <br>
+        <pre><code class="yaml" data-trim>
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: success-rate
+spec:
+  metrics:
+    - name: success-rate
+      interval: 60s
+      successCondition: result[0] >= 0.95
+      provider:
+        prometheus:
+          address: http://prometheus:9090
+          query: |
+            sum(rate(http_requests_total{
+              status=~"2.*",
+              service="{{args.service}}"
+            }[5m])) /
+            sum(rate(http_requests_total{
+              service="{{args.service}}"
+            }[5m]))
+        </code></pre>
+        <p>Automatic rollback if success rate drops below 95%</p>
+      </section>
+
+      <!-- Slide 18: Live Demo -->
+      <section data-background-color="#18d26e">
+        <h2>Live Demo</h2>
+        <p>Adding a new repository in 30 seconds</p>
+      </section>
+
+      <!-- Slide 19: Demo Step 1 -->
+      <section>
+        <h2>Demo: Add a New Repo</h2>
+        <br>
+        <pre><code class="typescript" data-trim>
+// Add to repos.config.ts
+{
+  name: "new-microservice",
+  description: "Order processing service",
+  visibility: "private",
+  topics: ["microservice", "nodejs", "kubernetes"],
+  branchProtection: {
+    main: standardProtection,
+  },
+  security: fullSecuritySuite,
+  files: standardFiles,
+  labels: defaultLabels,
+}
+        </code></pre>
+        <p>That's it. One object in an array.</p>
+      </section>
+
+      <!-- Slide 20: Demo Step 2 -->
+      <section>
+        <h2>Demo: What Happens Next</h2>
+        <br>
+        <pre><code class="bash" data-trim>
+$ git add repos.config.ts
+$ git commit -m "feat: add new-microservice repo"
+$ git push origin feat/new-microservice
+
+# CI Pipeline runs:
+# ✓ TypeScript type-check passes
+# ✓ Terraform plan shows 8 resources to create
+# ✓ Security scan clean
+
+# After merge:
+# ✓ Repository created
+# ✓ Branch protection applied
+# ✓ Security scanning enabled
+# ✓ CODEOWNERS file created
+# ✓ CI workflows deployed
+# ✓ Labels configured
+# ✓ Team access granted
+# ✓ Webhooks registered
+        </code></pre>
+      </section>
+
+      <!-- Slide 21: Lessons Learned -->
+      <section data-background-color="#18d26e">
+        <h2>Lessons Learned</h2>
+      </section>
+
+      <!-- Slide 22: Lesson 1 -->
+      <section>
+        <h2>Lesson 1: Start Small</h2>
+        <br>
+        <blockquote>
+          "Don't try to GitOps everything on day one."
+        </blockquote>
+        <br>
+        <ul>
+          <li>Start with repository settings (low risk)</li>
+          <li>Add branch protection next</li>
+          <li>Then CI/CD pipelines</li>
+          <li>Finally, infrastructure (Crossplane)</li>
+        </ul>
+      </section>
+
+      <!-- Slide 23: Lesson 2 -->
+      <section>
+        <h2>Lesson 2: Type Safety Saves You</h2>
+        <br>
+        <pre><code class="typescript" data-trim>
+// TypeScript catches mistakes at compile time
+interface RepoConfig {
+  name: string;
+  description: string;
+  visibility: "public" | "private";  // Not just string
+  branchProtection: BranchRules;
+  security: SecurityConfig;
+}
+
+// Typo? TypeScript catches it.
+// Wrong type? TypeScript catches it.
+// Missing required field? TypeScript catches it.
+        </code></pre>
+        <p>YAML doesn't give you this. TypeScript does.</p>
+      </section>
+
+      <!-- Slide 24: Lesson 3 -->
+      <section>
+        <h2>Lesson 3: Escape Hatches Matter</h2>
+        <br>
+        <ul>
+          <li>Not everything fits the standard template</li>
+          <li>Allow per-repo overrides</li>
+          <li>Document exceptions in the config file</li>
+          <li>Review overrides in PRs</li>
+        </ul>
+        <br><br>
+        <pre><code class="typescript" data-trim>
+{
+  name: "legacy-monolith",
+  // Override: needs different branch protection
+  // because of legacy CI system - tracked in JIRA-1234
+  branchProtection: {
+    main: { ...standardProtection, requiredReviews: 2 },
+    develop: { requiredReviews: 0 },  // legacy flow
+  },
+}
+        </code></pre>
+      </section>
+
+      <!-- Slide 25: Key Takeaways -->
+      <section>
+        <h2>Key Takeaways</h2>
+        <br>
+        <ol>
+          <li><span class="highlight">Git is your source of truth</span> - for everything</li>
+          <li><span class="highlight">TypeScript > YAML</span> - for config management</li>
+          <li><span class="highlight">Automate compliance</span> - don't rely on humans</li>
+          <li><span class="highlight">Progressive delivery</span> - ship safely at scale</li>
+          <li><span class="highlight">Start small, iterate</span> - don't boil the ocean</li>
+        </ol>
+      </section>
+
+      <!-- Slide 26: Resources -->
+      <section>
+        <h2>Resources</h2>
+        <br>
+        <ul>
+          <li><a href="https://github.com/basel5001/gitops-cluster">github.com/basel5001/gitops-cluster</a></li>
+          <li><a href="https://github.com/basel5001/githubinfra">github.com/basel5001/githubinfra</a></li>
+          <li><a href="https://argoproj.github.io/cd/">ArgoCD Documentation</a></li>
+          <li><a href="https://crossplane.io/docs/">Crossplane Documentation</a></li>
+          <li><a href="https://kyverno.io/docs/">Kyverno Documentation</a></li>
+        </ul>
+      </section>
+
+      <!-- Slide 27: Q&A -->
+      <section data-background-color="#18d26e">
+        <h2>Questions?</h2>
+        <br>
+        <p style="color: #000;">
+          <strong>Basel Mohamed</strong><br>
+          Senior DevOps Engineer<br><br>
+          github.com/basel5001<br>
+          linkedin.com/in/basel-mohamed-alam
+        </p>
+      </section>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/markdown/markdown.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+  <script src="../../shared/reveal-config.js"></script>
+</body>
+</html>

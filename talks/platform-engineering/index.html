@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Building an Internal Developer Platform from Scratch</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css">
+  <link rel="stylesheet" href="../../shared/theme.css">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: Title -->
+      <section data-background-color="#0a0a0a">
+        <h1>Building an Internal Developer Platform</h1>
+        <h3>From Scratch</h3>
+        <br>
+        <p class="speaker-info">
+          <strong>Basel Mohamed</strong> | Senior DevOps Engineer<br>
+          <a href="https://github.com/basel5001">github.com/basel5001</a> |
+          <a href="https://linkedin.com/in/basel-mohamed-alam">LinkedIn</a>
+        </p>
+        <aside class="notes">
+          Platform engineering is the hottest topic in DevOps right now.
+          But what does it actually look like to build one? Let me show you.
+        </aside>
+      </section>
+
+      <!-- Slide 2: What is Platform Engineering? -->
+      <section>
+        <h2>What is Platform Engineering?</h2>
+        <br>
+        <blockquote>
+          "The discipline of building and operating self-service
+          internal developer platforms for software delivery."
+        </blockquote>
+        <br>
+        <p>In plain English: <span class="highlight">Make developers faster by removing friction.</span></p>
+        <aside class="notes">
+          It's not about building a portal. It's about building golden paths
+          that make the right thing the easy thing.
+        </aside>
+      </section>
+
+      <!-- Slide 3: Why Self-Service? -->
+      <section data-background-color="#18d26e">
+        <h2>Why Self-Service Matters</h2>
+        <p>Stop being a bottleneck</p>
+      </section>
+
+      <!-- Slide 4: The Ticket Problem -->
+      <section>
+        <h2>The Ticket Problem</h2>
+        <br>
+        <pre><code class="text" data-trim>
+Without Platform Engineering:
+
+  Developer: "I need a new environment"
+  → Opens JIRA ticket
+  → Waits 3 days for DevOps
+  → DevOps manually provisions
+  → Back and forth on config
+  → 1 week later: environment ready
+
+With Platform Engineering:
+
+  Developer: Clicks "New Environment"
+  → Selects template
+  → 5 minutes later: environment ready
+        </code></pre>
+      </section>
+
+      <!-- Slide 5: Impact Numbers -->
+      <section>
+        <h2>The Impact</h2>
+        <br>
+        <div style="display: flex; gap: 1em; justify-content: center; flex-wrap: wrap;">
+          <div class="stat-box">
+            <div class="number">85%</div>
+            <div class="label">Fewer DevOps tickets</div>
+          </div>
+          <div class="stat-box">
+            <div class="number">5 min</div>
+            <div class="label">Environment provisioning</div>
+          </div>
+          <div class="stat-box">
+            <div class="number">100%</div>
+            <div class="label">Compliance by default</div>
+          </div>
+          <div class="stat-box">
+            <div class="number">4x</div>
+            <div class="label">Developer velocity</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 6: Architecture Section -->
+      <section data-background-color="#18d26e">
+        <h2>Architecture</h2>
+        <p>FastAPI + Terraform + AWS Bedrock</p>
+      </section>
+
+      <!-- Slide 7: Architecture Diagram -->
+      <section>
+        <h2>Platform Architecture</h2>
+        <br>
+        <pre><code class="text" data-trim>
+┌──────────────────────────────────────────────────┐
+│                  Web Dashboard                    │
+│              (React + TypeScript)                  │
+└──────────────────┬───────────────────────────────┘
+                   │ REST API
+┌──────────────────▼───────────────────────────────┐
+│              FastAPI Backend                      │
+├──────────┬───────────┬───────────┬───────────────┤
+│ Service  │ Environ-  │    AI     │    Cost       │
+│ Catalog  │ ment Mgmt │ Advisor   │  Tracking     │
+├──────────┴───────────┴───────────┴───────────────┤
+│              Terraform Engine                     │
+├──────────────────────────────────────────────────┤
+│         AWS / Kubernetes / GitHub                  │
+└──────────────────────────────────────────────────┘
+        </code></pre>
+      </section>
+
+      <!-- Slide 8: FastAPI Backend -->
+      <section>
+        <h2>FastAPI Backend</h2>
+        <br>
+        <pre><code class="python" data-trim data-line-numbers="1-5|7-18|20-28">
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+app = FastAPI(title="Cloud Platform API")
+
+# Service Catalog
+class ServiceRequest(BaseModel):
+    name: str
+    template: str  # "fastapi" | "nodejs" | "static"
+    environment: str  # "dev" | "staging" | "prod"
+    team: str
+    budget_limit: float = 100.0
+
+@app.post("/api/services")
+async def create_service(req: ServiceRequest):
+    """Provision a new service from the catalog."""
+    # Validate against policies
+    await policy_engine.validate(req)
+
+    # Run Terraform
+    result = await terraform.apply(
+        template=req.template,
+        variables={
+            "name": req.name,
+            "environment": req.environment,
+            "team": req.team,
+        }
+    )
+    return {"service_id": result.id, "status": "provisioning"}
+        </code></pre>
+      </section>
+
+      <!-- Slide 9: Service Catalog -->
+      <section>
+        <h2>Service Catalog</h2>
+        <br>
+        <table>
+          <thead>
+            <tr><th>Template</th><th>Includes</th><th>Time</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>FastAPI Service</td><td>API, DB, CI/CD, monitoring</td><td>3 min</td></tr>
+            <tr><td>Node.js Service</td><td>API, Redis, CI/CD, logging</td><td>3 min</td></tr>
+            <tr><td>Static Site</td><td>S3, CloudFront, CI/CD</td><td>1 min</td></tr>
+            <tr><td>Data Pipeline</td><td>Lambda, SQS, S3, Glue</td><td>5 min</td></tr>
+            <tr><td>ML Workload</td><td>SageMaker, S3, ECR</td><td>8 min</td></tr>
+          </tbody>
+        </table>
+        <br>
+        <p>Each template is a Terraform module with sensible defaults</p>
+      </section>
+
+      <!-- Slide 10: Terraform Templates -->
+      <section>
+        <h2>Terraform Templates</h2>
+        <br>
+        <pre><code class="hcl" data-trim data-line-numbers="1-8|10-22">
+# templates/fastapi-service/main.tf
+module "ecs_service" {
+  source = "../modules/ecs"
+  
+  name        = var.name
+  environment = var.environment
+  team        = var.team
+  image       = "${var.ecr_repo}:latest"
+
+  # Sensible defaults — overridable
+  cpu    = 256
+  memory = 512
+  
+  health_check_path = "/health"
+  
+  # Security defaults
+  enable_waf       = true
+  enable_logging   = true
+  encrypt_at_rest  = true
+  
+  # Auto-scaling
+  min_capacity = var.environment == "prod" ? 2 : 1
+  max_capacity = var.environment == "prod" ? 10 : 3
+}
+        </code></pre>
+      </section>
+
+      <!-- Slide 11: Environment Provisioning -->
+      <section data-background-color="#18d26e">
+        <h2>Environment Provisioning</h2>
+        <p>From ticket to self-service</p>
+      </section>
+
+      <!-- Slide 12: Environment API -->
+      <section>
+        <h2>Environment API</h2>
+        <br>
+        <pre><code class="python" data-trim data-line-numbers="1-9|11-23">
+class EnvironmentRequest(BaseModel):
+    name: str
+    type: Literal["dev", "staging", "prod"]
+    services: list[str]
+    ttl_hours: int = 24  # Auto-cleanup for dev
+
+@app.post("/api/environments")
+async def create_environment(req: EnvironmentRequest):
+    """Spin up a complete environment."""
+
+    # Provision infrastructure
+    infra = await terraform.apply(
+        template="environment",
+        variables={
+            "name": req.name,
+            "type": req.type,
+            "services": req.services,
+        }
+    )
+
+    # Schedule cleanup for dev environments
+    if req.type == "dev":
+        scheduler.add_job(
+            cleanup_environment,
+            trigger="date",
+            run_date=datetime.now() + timedelta(hours=req.ttl_hours),
+            args=[infra.id],
+        )
+
+    return {"environment_id": infra.id, "urls": infra.outputs}
+        </code></pre>
+      </section>
+
+      <!-- Slide 13: AI Advisor Section -->
+      <section data-background-color="#18d26e">
+        <h2>AI Advisor</h2>
+        <p>AWS Bedrock for intelligent recommendations</p>
+      </section>
+
+      <!-- Slide 14: AI Advisor -->
+      <section>
+        <h2>AI-Powered Architecture Advisor</h2>
+        <br>
+        <pre><code class="python" data-trim data-line-numbers="1-8|10-24">
+class AIAdvisor:
+    def __init__(self):
+        self.bedrock = boto3.client("bedrock-runtime")
+        self.model = "anthropic.claude-3-sonnet-20240229-v1:0"
+
+    async def recommend(
+        self, description: str, constraints: dict
+    ) -> Recommendation:
+
+        prompt = f"""You are a cloud architect.
+        Given this service description, recommend:
+        1. Best AWS services to use
+        2. Architecture pattern (monolith/microservice/serverless)
+        3. Estimated monthly cost
+        4. Security considerations
+        5. Scaling strategy
+
+        Service: {description}
+        Constraints: {json.dumps(constraints)}
+
+        Respond as JSON with these fields:
+        services, pattern, cost_estimate, security, scaling
+        """
+
+        response = self._invoke(prompt)
+        return Recommendation.parse(response)
+        </code></pre>
+      </section>
+
+      <!-- Slide 15: AI in Action -->
+      <section>
+        <h2>AI Advisor in Action</h2>
+        <br>
+        <pre><code class="json" data-trim>
+// Request: "REST API with auth, 1000 req/min, budget $200/mo"
+{
+  "services": ["API Gateway", "Lambda", "DynamoDB", "Cognito"],
+  "pattern": "serverless",
+  "cost_estimate": {
+    "monthly": "$145",
+    "breakdown": {
+      "API Gateway": "$35",
+      "Lambda": "$40",
+      "DynamoDB": "$50",
+      "Cognito": "$20"
+    }
+  },
+  "security": [
+    "Enable WAF on API Gateway",
+    "Use Cognito for JWT validation",
+    "Encrypt DynamoDB at rest with KMS"
+  ],
+  "scaling": "Auto-scales to 10,000 req/min with no changes"
+}
+        </code></pre>
+      </section>
+
+      <!-- Slide 16: Cost Tracking -->
+      <section data-background-color="#18d26e">
+        <h2>Cost Tracking</h2>
+        <p>Know what you're spending before you spend it</p>
+      </section>
+
+      <!-- Slide 17: Cost API -->
+      <section>
+        <h2>Cost Tracking API</h2>
+        <br>
+        <pre><code class="python" data-trim data-line-numbers="1-10|12-22">
+@app.get("/api/costs/{team}")
+async def get_team_costs(team: str, period: str = "month"):
+    """Get cost breakdown by team."""
+    costs = await cost_explorer.get_costs(
+        team=team,
+        period=period,
+        group_by=["service", "environment"],
+    )
+    return {
+        "team": team,
+        "total": costs.total,
+        "breakdown": costs.by_service,
+        "trend": costs.month_over_month,
+        "budget_remaining": costs.budget - costs.total,
+        "alerts": [
+            a for a in costs.alerts
+            if a.threshold_exceeded
+        ],
+    }
+
+@app.post("/api/costs/alerts")
+async def set_budget_alert(team: str, threshold: float):
+    """Alert when team exceeds budget threshold."""
+    await alerting.create_rule(
+        team=team,
+        threshold=threshold,
+        channels=["slack", "email"],
+    )
+        </code></pre>
+      </section>
+
+      <!-- Slide 18: Dashboard -->
+      <section>
+        <h2>Developer Dashboard</h2>
+        <br>
+        <pre><code class="text" data-trim>
+┌─────────────────────────────────────────────────┐
+│  Cloud Platform Dashboard          [Team: SRE]  │
+├─────────────────────────────────────────────────┤
+│                                                  │
+│  Services: 12 running  │  Environments: 5       │
+│  Cost: $1,247/mo       │  Budget: $2,000/mo     │
+│                                                  │
+│  Quick Actions:                                  │
+│  [+ New Service]  [+ New Env]  [Ask AI Advisor] │
+│                                                  │
+│  Recent Activity:                                │
+│  ✓ api-gateway deployed to staging    (2h ago)  │
+│  ✓ dev-env-test auto-cleaned          (4h ago)  │
+│  ! cost-alert: 62% of monthly budget  (1d ago)  │
+│                                                  │
+└─────────────────────────────────────────────────┘
+        </code></pre>
+      </section>
+
+      <!-- Slide 19: Demo Section -->
+      <section data-background-color="#18d26e">
+        <h2>Live Demo</h2>
+        <p>Provisioning a service in under 5 minutes</p>
+      </section>
+
+      <!-- Slide 20: Demo Flow -->
+      <section>
+        <h2>Demo: New Service in 5 Minutes</h2>
+        <br>
+        <pre><code class="bash" data-trim>
+# Step 1: Ask the AI advisor
+$ curl -X POST localhost:8000/api/advisor \
+  -d '{"description": "REST API for order processing",
+       "constraints": {"budget": 200, "traffic": "medium"}}'
+
+# Step 2: Create service from recommendation
+$ curl -X POST localhost:8000/api/services \
+  -d '{"name": "order-api",
+       "template": "fastapi",
+       "environment": "dev",
+       "team": "backend"}'
+
+# Step 3: Check status
+$ curl localhost:8000/api/services/order-api/status
+# {"status": "ready", "url": "https://order-api.dev.internal"}
+
+# Step 4: Deploy to staging
+$ curl -X POST localhost:8000/api/services/order-api/promote \
+  -d '{"target": "staging"}'
+        </code></pre>
+      </section>
+
+      <!-- Slide 21: Lessons Learned -->
+      <section data-background-color="#18d26e">
+        <h2>Lessons Learned</h2>
+      </section>
+
+      <!-- Slide 22: Golden Paths -->
+      <section>
+        <h2>Build Golden Paths, Not Golden Cages</h2>
+        <br>
+        <div class="columns">
+          <div class="col">
+            <h3 style="color: #18d26e;">Golden Path</h3>
+            <ul>
+              <li>Opinionated defaults</li>
+              <li>Easy to follow</li>
+              <li>Escape hatches exist</li>
+              <li>Teams can customize</li>
+            </ul>
+          </div>
+          <div class="col">
+            <h3 style="color: #e74c3c;">Golden Cage</h3>
+            <ul>
+              <li>Rigid rules</li>
+              <li>No flexibility</li>
+              <li>Teams work around it</li>
+              <li>Shadow IT grows</li>
+            </ul>
+          </div>
+        </div>
+        <br>
+        <p>Make the right thing the <span class="highlight">easy</span> thing</p>
+      </section>
+
+      <!-- Slide 23: Key Takeaways -->
+      <section>
+        <h2>Key Takeaways</h2>
+        <br>
+        <ol>
+          <li><span class="highlight">Start with the highest-friction workflows</span></li>
+          <li><span class="highlight">Templates > tickets</span> for provisioning</li>
+          <li><span class="highlight">AI augments, doesn't replace</span> human judgment</li>
+          <li><span class="highlight">Cost visibility drives accountability</span></li>
+          <li><span class="highlight">Measure developer experience</span>, not just uptime</li>
+        </ol>
+      </section>
+
+      <!-- Slide 24: Resources -->
+      <section>
+        <h2>Resources</h2>
+        <br>
+        <ul>
+          <li><a href="https://github.com/basel5001/cloud-platform">github.com/basel5001/cloud-platform</a></li>
+          <li><a href="https://platformengineering.org">Platform Engineering Community</a></li>
+          <li><a href="https://internaldeveloperplatform.org">Internal Developer Platform Guide</a></li>
+          <li><a href="https://fastapi.tiangolo.com">FastAPI Documentation</a></li>
+        </ul>
+      </section>
+
+      <!-- Slide 25: Q&A -->
+      <section data-background-color="#18d26e">
+        <h2>Questions?</h2>
+        <br>
+        <p style="color: #000;">
+          <strong>Basel Mohamed</strong><br>
+          Senior DevOps Engineer<br><br>
+          github.com/basel5001<br>
+          linkedin.com/in/basel-mohamed-alam
+        </p>
+      </section>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/markdown/markdown.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+  <script src="../../shared/reveal-config.js"></script>
+</body>
+</html>
